@@ -9,7 +9,7 @@ from utils import example_images, setup_logger
 
 import torch
 import torch.nn as nn
-from model import EyeTrackingV1, EyeTrackingV2
+from model import EyeTrackingV1_resnet18, EyeTrackingV2_resnet18, EyeTracking_resnet34, EyeTracking_resnet50
 import torch.nn.functional as F
 
 # For importing data
@@ -48,10 +48,10 @@ if __name__=="__main__":
     example_images(train_loader)
 
     # Loading Model
-    resnet = EyeTrackingV1()
+    resnet = EyeTracking_resnet34()
 
     # ResNet18 summary
-    # summary(resnet.to(device), [(3, 640, 480), (2,)])
+    summary(resnet.to(device), [(3, 640, 480)])
 
     resnet.to(device)
 

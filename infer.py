@@ -1,9 +1,10 @@
+import cv2
 import torch
 import numpy as np
 import torch.nn as nn
 import torch.quantization
 from parser import get_opts_inference
-from model import EyeTrackingV1, EyeTrackingV2
+from model import EyeTrackingV1_resnet18, EyeTrackingV2_resnet18, EyeTracking_resnet34, EyeTracking_resnet50
 
 # For importing data
 import torchvision
@@ -26,13 +27,9 @@ if __name__=='__main__':
     transform = T.Compose([ T.ToTensor(), # Normalizes to range [0,1]
                             T.Normalize(mean=[0.485, 0.456, 0.406], std=[0.229, 0.224, 0.225]) # Further normalization
                         ])
-
-    # Loading Dataset
-    dataset = EyeDataset(csv_files=['14.csv'], root_dir='dataset', transform=transform)
-    inference_loader = DataLoader(dataset=dataset, batch_size=2, shuffle=True)
-
+    
     # Loading Model
-    resnet = EyeTrackingV1()
+    resnet = EyeTrackingV1_resnet18()
 
     # Load the saved state_dict into the model
     resnet.load(args.weight)
@@ -48,11 +45,44 @@ if __name__=='__main__':
     else:
         resnet.to(device)
 
-    for X, y in tqdm(inference_loader, desc=f'Inference test'):
-        # Denormalize input image
-        img = X[0].numpy().transpose((1,2,0))
-        img = img-np.min(img)
-        img = img/np.max(img)
+    # Loading Dataset
+    if args.image == None:
+        dataset = EyeDataset(csv_files=['14.csv'], root_dir='dataset', transform=transform)
+        inference_loader = DataLoader(dataset=dataset, batch_size=2, shuffle=True)
+
+        for X, y in tqdm(inference_loader, desc=f'Inference test'):
+            # Denormalize input image
+            img = X[0].numpy().transpose((1,2,0))
+            img = img-np.min(img)
+            img = img/np.max(img)
+
+            # Push data to GPU
+            if not args.quantization:
+                X = X.to(device)
+
+            start_time = time.time()
+
+            # Perform inference with the model
+            with torch.no_grad():
+                output = resnet(X)
+            
+            elapsed_time = (time.time()-start_time)*1000.0
+
+            plt.imshow(img)
+            plt.title(f"\nElapsed time: {elapsed_time:.4f} ms")
+            plt.text(0,0,f'{y[0][0]:.4f}, {y[0][1]:.4f}',ha='left',va='top',fontweight='bold',color='k',backgroundcolor='g')
+            plt.text(img.shape[1],0,f'{output[0][0]:.4f}, {output[0][1]:.4f}',ha='right',va='top',fontweight='bold',color='k',backgroundcolor='r')
+            plt.axis('off')
+
+            plt.show()
+
+    else:
+        # Read the image
+        img = cv2.imread(args.image)
+
+        # Apply transformation to the image
+        X = transform(img)
+        X = X[np.newaxis, ...]
 
         # Push data to GPU
         if not args.quantization:
@@ -68,8 +98,15 @@ if __name__=='__main__':
 
         plt.imshow(img)
         plt.title(f"\nElapsed time: {elapsed_time:.4f} ms")
-        plt.text(0,0,f'{y[0][0]:.4f}, {y[0][1]:.4f}',ha='left',va='top',fontweight='bold',color='k',backgroundcolor='g')
         plt.text(img.shape[1],0,f'{output[0][0]:.4f}, {output[0][1]:.4f}',ha='right',va='top',fontweight='bold',color='k',backgroundcolor='r')
         plt.axis('off')
 
         plt.show()
+
+
+
+    
+
+    
+
+    
